@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # 1. Database Bán hàng (MySQL 8.0)
+  mysql:
+    image: mysql:8.0
+    container_name: noah_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: webstore
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./init_db:/docker-entrypoint-initdb.d
+      - mysql_data:/var/lib/mysql
+
+  # 2. Database Tài chính (PostgreSQL 15)
+  postgres:
+    image: postgres:15
+    container_name: noah_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: rootpassword
+      POSTGRES_DB: finance
+    ports:
+      - "5432:5432"
+
+  # 3. Message Broker (RabbitMQ 3)
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: noah_rabbitmq
+    ports:
+      - "5672:5672"     # Cổng để nhận/gửi tin nhắn
+      - "15672:15672"   # Cổng để mở giao diện Web xem tin nhắn
+
+  # 4. Cổng bảo mật (Kong Gateway)
+  kong:
+    image: kong:latest
+    container_name: noah_kong
+    environment:
+      KONG_DATABASE: "off"  # Cấu hình chạy không cần DB riêng (DB-less mode)
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+
+  # 5. Module 1: Đồng bộ kho (Legacy Adapter)
+  legacy_adapter:
+    build: ./module_1
+    container_name: noah_legacy_adapter
+    environment:
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      - mysql
+    volumes:
+      - ./data_volumes/input:/app/input
+      - ./data_volumes/processed:/app/processed
+      - ./data_volumes/error:/app/error
+volumes:
+  mysql_data:
