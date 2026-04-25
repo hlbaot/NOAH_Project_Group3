@@ -1,0 +1,10 @@
+
+
+# Các file rác của Python 
+__pycache__/
+*.pyc
+.DS_Store
+
+# Bỏ qua thư mục Database nội bộ (nếu có)
+mysql_data/
+postgres_data/
