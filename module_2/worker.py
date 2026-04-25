@@ -203,7 +203,7 @@ def main():
     channel = connection.channel()
     channel.queue_declare(queue=order_queue_name(), durable=True)
     channel.basic_qos(prefetch_count=1)
-    channel.basic_consume(queue=order_queue_name(), on_message_callback=process_message)đồ
+    channel.basic_consume(queue=order_queue_name(), on_message_callback=process_message)
 
     logger.info("Worker is waiting for messages on queue=%s", order_queue_name())
     channel.start_consuming()
