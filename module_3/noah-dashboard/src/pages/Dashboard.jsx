@@ -20,6 +20,7 @@ export default function Dashboard() {
   const orders   = (data && data.orders) || [];
   const customers = (data && data.revenue_by_customer) || [];
   const pagination = (data && data.pagination) || { page: 1, page_size: PAGE_SIZE, total_rows: 0 };
+  const aiInsight = data?.ai_insight || 'Đang chờ dữ liệu nhận định AI.';
   const paidRevenue = summary.total_revenue || 0;
 
   return (
@@ -140,6 +141,22 @@ export default function Dashboard() {
               pending={Number(summary.pending_orders ?? 0)} 
             />
           </div>
+        </div>
+      </div>
+
+      {/* AI Insight */}
+      <div className="glass-card animate-fade-in" style={{ padding: 24, marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
+          <div>
+            <h3 style={{ fontSize: 16, fontWeight: 600 }}>Nhận định AI</h3>
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Gemini phân tích từ dữ liệu đã hợp nhất</p>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--primary)', background: 'var(--primary-glow)', padding: '5px 10px', borderRadius: 8, fontWeight: 600, fontFamily: 'var(--mono)' }}>
+            GEMINI
+          </div>
+        </div>
+        <div style={{ whiteSpace: 'pre-line', color: 'var(--text)', fontSize: 14, lineHeight: 1.7 }}>
+          {aiInsight}
         </div>
       </div>
 

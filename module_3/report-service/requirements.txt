@@ -5,3 +5,4 @@ pymysql
 psycopg2-binary
 pandas
 cryptography
+httpx
