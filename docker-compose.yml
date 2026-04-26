@@ -1,24 +1,24 @@
 services:
+  # 1. Database Ban hang (MySQL 8.0)
   mysql:
     image: mysql:8.0
     container_name: noah_mysql
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: webstore
-      MYSQL_USER: noah_user
-      MYSQL_PASSWORD: noah_password
-      MYSQL_ROOT_HOST: "%"
     ports:
       - "3306:3306"
     volumes:
-      - ./init_db:/docker-entrypoint-initdb.d
+      - ./init_db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
       - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-prootpassword"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 20s
 
+  # 2. Database Tai chinh (PostgreSQL 15)
   postgres:
     image: postgres:15
     container_name: noah_postgres
@@ -28,44 +28,119 @@ services:
       POSTGRES_DB: finance
     ports:
       - "5432:5432"
+    volumes:
+      - ./init_db/init_postgres.sql:/docker-entrypoint-initdb.d/init_postgres.sql:ro
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d finance"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
+  # 3. Message Broker (RabbitMQ 3)
   rabbitmq:
     image: rabbitmq:3-management
     container_name: noah_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: noah
+      RABBITMQ_DEFAULT_PASS: noahpassword
     ports:
       - "5672:5672"
       - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
+  # 4. Module 2A: Order API (Producer)
   order_api:
-    build: ./module_4/order_api
+    build: ./module_2/Modul_2A
     container_name: noah_order_api
     environment:
+      PYTHONUNBUFFERED: 1
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_USER: noah_user
-      DB_PASSWORD: noah_password
       DB_NAME: webstore
+      DB_USER: root
+      DB_PASSWORD: rootpassword
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: noah
+      RABBITMQ_PASSWORD: noahpassword
+      RABBITMQ_QUEUE: order_queue
+      CONNECT_RETRY_ATTEMPTS: 10
+      CONNECT_RETRY_DELAY_SECONDS: 3
     expose:
       - "5000"
     depends_on:
       mysql:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
-  report-service:
-    build: ./module_4/report_service
-    container_name: noah-report-service
+  # 5. Module 2B: Order Worker (Consumer)
+  order-worker:
+    build: ./module_2/Modul_2B
+    container_name: noah_order_worker
     environment:
+      PYTHONUNBUFFERED: 1
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_USER: noah_user
-      DB_PASSWORD: noah_password
       DB_NAME: webstore
+      DB_USER: root
+      DB_PASSWORD: rootpassword
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DB: finance
+      PG_USER: postgres
+      PG_PASSWORD: rootpassword
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: noah
+      RABBITMQ_PASSWORD: noahpassword
+      RABBITMQ_QUEUE: order_queue
+      CONNECT_RETRY_ATTEMPTS: 10
+      CONNECT_RETRY_DELAY_SECONDS: 3
+    depends_on:
+      mysql:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  # 6. Module 3: Report Service
+  report-service:
+    build: ./module_3/report-service
+    container_name: noah_report
+    environment:
+      PYTHONUNBUFFERED: 1
+      MYSQL_URL: mysql+pymysql://root:rootpassword@mysql:3306/webstore
+      POSTGRES_URL: postgresql+psycopg2://postgres:rootpassword@postgres:5432/finance
     expose:
       - "5001"
     depends_on:
       mysql:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
 
+  # 7. Module 3: Dashboard UI
+  dashboard:
+    build: ./module_3/noah-dashboard
+    container_name: noah_dashboard
+    environment:
+      VITE_API_URL: ""
+      VITE_PROXY_TARGET: http://report-service:5001
+    depends_on:
+      - report-service
+    ports:
+      - "3000:3000"
+
+  # 8. Cong bao mat (Kong Gateway)
   kong:
     image: kong:latest
     container_name: noah_kong
@@ -82,5 +157,20 @@ services:
       - order_api
       - report-service
 
+  # 9. Module 1: Dong bo kho (Legacy Adapter)
+  legacy_adapter:
+    build: ./module_1
+    container_name: noah_legacy_adapter
+    environment:
+      PYTHONUNBUFFERED: 1
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./data_volumes/input:/app/input
+      - ./data_volumes/processed:/app/processed
+      - ./data_volumes/error:/app/error
+
 volumes:
   mysql_data:
+  postgres_data:

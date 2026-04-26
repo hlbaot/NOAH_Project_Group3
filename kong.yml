@@ -1,15 +1,12 @@
 _format_version: "3.0"
-_transform: true
 
 services:
-  - name: order-api
-    url: http://order_api:5000
+  - name: order-service
+    url: http://order-api:5000
     routes:
-      - name: order-api-route
+      - name: order-route
         paths:
           - /orders
-        methods:
-          - GET
         strip_path: false
 
   - name: report-service
@@ -18,8 +15,6 @@ services:
       - name: report-route
         paths:
           - /report
-        methods:
-          - GET
         strip_path: false
 
 plugins:
