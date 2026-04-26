@@ -2,10 +2,10 @@ _format_version: "3.0"
 _transform: true
 
 services:
-  - name: order-service
-    url: http://order-api:5000
+  - name: order-api
+    url: http://order_api:5000
     routes:
-      - name: order-route
+      - name: order-api-route
         paths:
           - /orders
         methods:

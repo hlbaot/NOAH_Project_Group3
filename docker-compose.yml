@@ -36,9 +36,9 @@ services:
       - "5672:5672"
       - "15672:15672"
 
-  order-api:
+  order_api:
     build: ./module_4/order_api
-    container_name: noah-order-api
+    container_name: noah_order_api
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
@@ -79,7 +79,7 @@ services:
     volumes:
       - ./kong.yml:/usr/local/kong/declarative/kong.yml:ro
     depends_on:
-      - order-api
+      - order_api
       - report-service
 
 volumes:
