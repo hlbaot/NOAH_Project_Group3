@@ -8,6 +8,7 @@ import pandas as pd
 from db import mysql_engine, postgres_engine
 
 logger = logging.getLogger("report-service.report")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def get_ai_insight(summary: dict, revenue_by_customer: list) -> str:
@@ -15,7 +16,7 @@ def get_ai_insight(summary: dict, revenue_by_customer: list) -> str:
     if not api_key:
         return "Chưa cấu hình GEMINI_API_KEY nên hệ thống chỉ hiển thị báo cáo dữ liệu, chưa tạo nhận định AI."
 
-    model = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     top_customers = revenue_by_customer[:5]
     prompt = f"""
 Bạn là trợ lý phân tích dữ liệu bán lẻ cho dashboard NOAH.
