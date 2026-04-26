@@ -50,7 +50,7 @@ Tập trung vào: doanh thu, rủi ro đối soát thanh toán, và hành độn
         return "Chưa tạo được nhận định AI từ Gemini. Báo cáo dữ liệu vẫn đang hoạt động bình thường."
 
 
-def get_report(page: int = 1, page_size: int = 20):
+def get_report(page: int = 1, page_size: int = 20, include_ai: bool = False):
     started_at = time.perf_counter()
     offset = (page - 1) * page_size
     logger.info(
@@ -199,8 +199,6 @@ def get_report(page: int = 1, page_size: int = 20):
         "order_status_counts": order_status_counts,
         "total_revenue": total_revenue
     }
-    ai_insight = get_ai_insight(summary_result, revenue_by_customer_result)
-
     duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
     logger.info(
         "Report ready | page=%s | returned_rows=%s | total_orders=%s | paid_orders=%s | duration_ms=%s",
@@ -211,10 +209,9 @@ def get_report(page: int = 1, page_size: int = 20):
         duration_ms,
     )
 
-    return {
+    result = {
         "success": True,
         "summary": summary_result,
-        "ai_insight": ai_insight,
         "revenue_by_customer": revenue_by_customer_result,
         "orders": orders_result,
         "pagination": {
@@ -223,3 +220,8 @@ def get_report(page: int = 1, page_size: int = 20):
             "total_rows": total_orders
         }
     }
+
+    if include_ai:
+        result["ai_insight"] = get_ai_insight(summary_result, revenue_by_customer_result)
+
+    return result

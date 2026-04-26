@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from report_service import get_report
+from report_service import get_ai_insight, get_report
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,3 +57,9 @@ def ui_log(payload: UILogRequest):
         payload.timestamp or "n/a",
     )
     return {"success": True}
+
+@app.get("/api/ai-insight")
+def ai_insight():
+    report = get_report(page=1, page_size=1)
+    insight = get_ai_insight(report["summary"], report["revenue_by_customer"])
+    return {"insight": insight}
