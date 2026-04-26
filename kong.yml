@@ -1,4 +1,5 @@
 _format_version: "3.0"
+_transform: true
 
 services:
   - name: order-service
@@ -7,6 +8,8 @@ services:
       - name: order-route
         paths:
           - /orders
+        methods:
+          - GET
         strip_path: false
 
   - name: report-service
@@ -15,6 +18,8 @@ services:
       - name: report-route
         paths:
           - /report
+        methods:
+          - GET
         strip_path: false
 
 plugins:

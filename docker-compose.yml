@@ -77,7 +77,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./kong/kong.yml:/usr/local/kong/declarative/kong.yml:ro
+      - ./kong.yml:/usr/local/kong/declarative/kong.yml:ro
     depends_on:
       - order-api
       - report-service
