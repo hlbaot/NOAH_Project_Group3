@@ -1,14 +1,61 @@
 import logging
+import os
 import time
 from collections import OrderedDict
 
+import httpx
 import pandas as pd
 from db import mysql_engine, postgres_engine
 
 logger = logging.getLogger("report-service.report")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
-def get_report(page: int = 1, page_size: int = 20):
+def get_ai_insight(summary: dict, revenue_by_customer: list, top_products: list) -> str:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return "Chưa cấu hình GEMINI_API_KEY nên hệ thống chỉ hiển thị báo cáo dữ liệu, chưa tạo nhận định AI."
+
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    top_customers = revenue_by_customer[:5]
+    top_products = top_products[:5]
+    prompt = f"""
+Bạn là trợ lý phân tích dữ liệu bán lẻ cho dashboard NOAH.
+Hãy viết 3 gạch đầu dòng ngắn bằng tiếng Việt, dễ hiểu cho quản lý.
+
+Dữ liệu tổng quan:
+- Tổng đơn hàng: {summary.get("total_orders", 0)}
+- Đã thanh toán: {summary.get("paid_orders", 0)}
+- Cần đối soát: {summary.get("pending_orders", 0)}
+- Thất bại: {summary.get("failed_orders", 0)}
+- Hoàn tiền: {summary.get("refunded_orders", 0)}
+- Doanh thu thực: {summary.get("total_revenue", 0)}
+
+Top khách hàng theo doanh thu:
+{top_customers}
+
+Top sản phẩm theo doanh thu đơn hàng:
+{top_products}
+
+Tập trung vào: doanh thu, sản phẩm nổi bật, rủi ro đối soát thanh toán, và hành động nên làm tiếp theo.
+""".strip()
+
+    try:
+        with httpx.Client(timeout=15) as client:
+            res = client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+                params={"key": api_key},
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+            )
+            res.raise_for_status()
+            payload = res.json()
+            return payload["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as exc:
+        logger.warning("Gemini insight generation failed: %s", exc)
+        return "Chưa tạo được nhận định AI từ Gemini. Báo cáo dữ liệu vẫn đang hoạt động bình thường."
+
+
+def get_report(page: int = 1, page_size: int = 20, include_ai: bool = False):
     started_at = time.perf_counter()
     offset = (page - 1) * page_size
     logger.info(
@@ -132,6 +179,18 @@ def get_report(page: int = 1, page_size: int = 20):
             .sort_values(by="total_revenue", ascending=False)
         )
 
+    # Top products from MySQL order detail
+    top_products_df = (
+        merged_df.groupby("product_name", dropna=False)
+        .agg(
+            total_order_value=("total_price", "sum"),
+            total_quantity=("quantity", "sum"),
+            order_count=("order_id", "nunique"),
+        )
+        .reset_index()
+        .sort_values(by="total_order_value", ascending=False)
+    )
+
     # Order detail table
     orders_result = paginated_df[
         [
@@ -147,7 +206,17 @@ def get_report(page: int = 1, page_size: int = 20):
     ].fillna("").to_dict(orient="records")
 
     revenue_by_customer_result = revenue_by_customer_df.head(8).fillna("").to_dict(orient="records")
-
+    top_products_result = top_products_df.head(8).fillna("").to_dict(orient="records")
+    summary_result = {
+        "total_orders": total_orders,
+        "paid_orders": paid_orders,
+        "pending_orders": pending_orders,
+        "failed_orders": failed_orders,
+        "refunded_orders": refunded_orders,
+        "payment_status_counts": payment_status_counts,
+        "order_status_counts": order_status_counts,
+        "total_revenue": total_revenue
+    }
     duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
     logger.info(
         "Report ready | page=%s | returned_rows=%s | total_orders=%s | paid_orders=%s | duration_ms=%s",
@@ -158,19 +227,11 @@ def get_report(page: int = 1, page_size: int = 20):
         duration_ms,
     )
 
-    return {
+    result = {
         "success": True,
-        "summary": {
-            "total_orders": total_orders,
-            "paid_orders": paid_orders,
-            "pending_orders": pending_orders,
-            "failed_orders": failed_orders,
-            "refunded_orders": refunded_orders,
-            "payment_status_counts": payment_status_counts,
-            "order_status_counts": order_status_counts,
-            "total_revenue": total_revenue
-        },
+        "summary": summary_result,
         "revenue_by_customer": revenue_by_customer_result,
+        "top_products": top_products_result,
         "orders": orders_result,
         "pagination": {
             "page": page,
@@ -178,3 +239,8 @@ def get_report(page: int = 1, page_size: int = 20):
             "total_rows": total_orders
         }
     }
+
+    if include_ai:
+        result["ai_insight"] = get_ai_insight(summary_result, revenue_by_customer_result, top_products_result)
+
+    return result

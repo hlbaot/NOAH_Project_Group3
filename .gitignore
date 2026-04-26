@@ -4,6 +4,7 @@
 __pycache__/
 *.pyc
 .DS_Store
+.env
 
 # Bỏ qua thư mục Database nội bộ (nếu có)
 mysql_data/

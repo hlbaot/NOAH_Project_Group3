@@ -4,6 +4,7 @@ import KPICard from '../components/KPICard';
 import CustomerBars from '../components/CustomerBars';
 import StatusChart from '../components/StatusChart';
 import OrderTable from '../components/OrderTable';
+import AIInsight from '../components/allInsight';
 
 function fmt(n) {
   if (n >= 1e9) return (n / 1e9).toFixed(1) + ' tỷ ₫';
@@ -142,6 +143,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <AIInsight />
 
       {/* Order Table Section */}
       <div className="glass-card animate-fade-in" style={{ padding: 0, overflow: 'hidden' }}>
