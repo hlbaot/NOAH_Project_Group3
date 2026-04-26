@@ -55,9 +55,35 @@ services:
       retries: 10
       start_period: 20s
 
-  # 4. Module 2: Order Worker (Consumer)
+  # 4. Module 2A: Order API (Producer)
+  order_api:
+    build: ./module_2/Modul_2A
+    container_name: noah_order_api
+    environment:
+      PYTHONUNBUFFERED: 1
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: webstore
+      DB_USER: root
+      DB_PASSWORD: rootpassword
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: noah
+      RABBITMQ_PASSWORD: noahpassword
+      RABBITMQ_QUEUE: order_queue
+      CONNECT_RETRY_ATTEMPTS: 10
+      CONNECT_RETRY_DELAY_SECONDS: 3
+    depends_on:
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+
+  # 5. Module 2B: Order Worker (Consumer)
   order-worker:
-    build: ./module_2
+    build: ./module_2/Modul_2B
     container_name: noah_order_worker
     environment:
       PYTHONUNBUFFERED: 1
@@ -127,6 +153,7 @@ services:
     volumes:
       - ./kong.yml:/usr/local/kong/declarative/kong.yml:ro
     depends_on:
+      - order_api
       - report-service
 
   # 8. Module 1: Đồng bộ kho (Legacy Adapter)

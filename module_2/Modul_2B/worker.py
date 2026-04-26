@@ -106,25 +106,42 @@ def ensure_finance_table():
         cur = conn.cursor()
         cur.execute(
             """
-            CREATE TABLE IF NOT EXISTS finance_transactions (
+            CREATE TABLE IF NOT EXISTS customers (
+                id INT PRIMARY KEY,
+                name VARCHAR(255) NOT NULL
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS payments (
                 id SERIAL PRIMARY KEY,
                 order_id INT NOT NULL UNIQUE,
-                user_id INT NOT NULL,
-                product_id INT NOT NULL,
-                quantity INT NOT NULL,
-                total_price NUMERIC(10, 2) NOT NULL,
-                status VARCHAR(50) NOT NULL DEFAULT 'SYNCED',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                customer_id INT NOT NULL,
+                amount NUMERIC(10, 2) NOT NULL,
+                status VARCHAR(50) NOT NULL DEFAULT 'PAID',
+                paid_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
         conn.commit()
-        logger.info("finance_transactions table is ready")
+        logger.info("customers and payments tables are ready")
     finally:
         if cur:
             cur.close()
         if conn:
             conn.close()
+
+
+def upsert_customer(cur, customer_id):
+    cur.execute(
+        """
+        INSERT INTO customers (id, name)
+        VALUES (%s, %s)
+        ON CONFLICT (id) DO NOTHING
+        """,
+        (int(customer_id), f"Customer_{int(customer_id)}"),
+    )
 
 
 def insert_finance_transaction(message):
@@ -133,24 +150,26 @@ def insert_finance_transaction(message):
     try:
         conn = postgres_connection()
         cur = conn.cursor()
+        upsert_customer(cur, message["user_id"])
         cur.execute(
             """
-            INSERT INTO finance_transactions
-            (order_id, user_id, product_id, quantity, total_price, status)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (order_id) DO NOTHING
+            INSERT INTO payments
+            (order_id, customer_id, amount, status)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (order_id) DO UPDATE
+            SET customer_id = EXCLUDED.customer_id,
+                amount = EXCLUDED.amount,
+                status = EXCLUDED.status
             """,
             (
                 int(message["order_id"]),
                 int(message["user_id"]),
-                int(message["product_id"]),
-                int(message["quantity"]),
                 Decimal(message["total_price"]),
-                "SYNCED",
+                "PAID",
             ),
         )
         conn.commit()
-        logger.info("Inserted order_id=%s into PostgreSQL", message["order_id"])
+        logger.info("Inserted order_id=%s into PostgreSQL payments", message["order_id"])
     finally:
         if cur:
             cur.close()
@@ -194,6 +213,7 @@ def process_message(ch, method, properties, body):
 
     except Exception as exc:
         logger.exception("Failed to process message: %s", exc)
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
 
 def main():
