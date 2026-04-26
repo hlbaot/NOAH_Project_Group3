@@ -40,9 +40,10 @@ export default function AIInsight() {
       </div>
 
       {insight && (
-        <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, borderLeft: '3px solid #3b82f6', paddingLeft: 12, whiteSpace: 'pre-line' }}>
-          {insight}
-        </p>
+        <div
+          style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, borderLeft: '3px solid #3b82f6', paddingLeft: 12 }}
+          dangerouslySetInnerHTML={{ __html: insight.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br/>') }}
+        />
       )}
 
       {!insight && !loading && (
